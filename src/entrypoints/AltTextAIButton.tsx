@@ -20,6 +20,12 @@ async function fetchAlt(
 ) {
   const { url } = await client.uploads.find(asset.upload_id);
 
+  // Instead of sending over files that are possibly too big or the wrong format, etc.,
+  // we'll use Imgix to pre-transform them into a valid format and smaller size
+  let transformedUrl = new URL(url);
+  transformedUrl.searchParams.set("fm", "jpeg");
+  transformedUrl.searchParams.set("w", "1024");
+
   const result = await (
     await fetch('https://alttext.ai/api/v1/images', {
       method: 'POST',
@@ -29,7 +35,7 @@ async function fetchAlt(
       },
       body: JSON.stringify({
         image: {
-          url,
+          url: transformedUrl.toString(),
         },
       }),
     })
