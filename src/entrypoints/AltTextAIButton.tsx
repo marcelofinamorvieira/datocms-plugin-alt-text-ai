@@ -2,7 +2,6 @@ import { Client, buildClient } from '@datocms/cma-client-browser';
 import {
   type FileFieldValue,
   RenderFieldExtensionCtx,
-  type Upload,
 } from "datocms-plugin-sdk";
 import { Button, Canvas, Spinner } from 'datocms-react-ui';
 import { isArray } from 'lodash';
