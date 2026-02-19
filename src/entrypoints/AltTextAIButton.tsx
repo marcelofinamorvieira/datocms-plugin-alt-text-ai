@@ -1,5 +1,9 @@
 import { Client, buildClient } from '@datocms/cma-client-browser';
-import { RenderFieldExtensionCtx } from 'datocms-plugin-sdk';
+import {
+  type FileFieldValue,
+  RenderFieldExtensionCtx,
+  type Upload,
+} from "datocms-plugin-sdk";
 import { Button, Canvas, Spinner } from 'datocms-react-ui';
 import { isArray } from 'lodash';
 import get from 'lodash/get';
@@ -12,7 +16,7 @@ type PropTypes = {
 async function fetchAlt(
   apiKey: string,
   client: Client,
-  asset: Record<string, string>
+  asset: FileFieldValue
 ) {
   const { url } = await client.uploads.find(asset.upload_id);
 
@@ -39,25 +43,39 @@ async function generateAlts(
   ctx: RenderFieldExtensionCtx,
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>
 ) {
+  if (!ctx.currentUserAccessToken) {
+    await ctx.alert('This plugin needs the currentUserAccessToken to function. Please give it that permission and try again.');
+    return
+  }
+
   setIsLoading(true);
   try {
     const client = buildClient({ apiToken: ctx.currentUserAccessToken || '' });
     const isGallery = isArray(currentFieldValue);
     if (isGallery) {
+      const existingAssets = currentFieldValue as FileFieldValue[]
       const newAssets = [];
-      for (const asset of currentFieldValue) {
+      for (const asset of existingAssets) {
+        console.log('asset', asset);
         const result = await fetchAlt(
           ctx.plugin.attributes.parameters.apiKey as string,
           client,
           asset
         );
 
+        if (result.error_code) {
+          ctx.alert(
+            `Alt text error for <a href="/media/assets/${asset.upload_id}" target="_blank">image ${asset.upload_id}</a>: <code>${result.error_code}: ${result.errors?.base?.[0] ?? ""}</code>`,
+          );
+        }
+
+
         asset.alt = result.alt_text;
         newAssets.push(asset);
       }
       ctx.setFieldValue(ctx.fieldPath, newAssets);
     } else {
-      const assetValue = currentFieldValue as Record<string, string>;
+      const assetValue = currentFieldValue as FileFieldValue;
 
       const result = await fetchAlt(
         ctx.plugin.attributes.parameters.apiKey as string,
@@ -65,14 +83,22 @@ async function generateAlts(
         assetValue
       );
 
+      if (result.error_code) {
+        await ctx.alert(
+          `Error fetching alt text: <code>${result.error_code}: ${result.errors?.base?.[0] ?? ""}</code>`,
+        );
+        return;
+      }
+
+
       assetValue.alt = result.alt_text;
       ctx.setFieldValue(ctx.fieldPath, assetValue);
     }
   } catch (error) {
     console.log(error);
+  } finally {
+    setIsLoading(false);
   }
-
-  setIsLoading(false);
 }
 
 const AltTextAIButton = ({ ctx }: PropTypes) => {
